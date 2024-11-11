@@ -3,6 +3,9 @@
 /* assignment specific globals */
 const INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog4/triangles.json"; // triangles file loc
 const INPUT_ELLIPSOIDS_URL = "https://ncsucgclass.github.io/prog4/ellipsoids.json"; // ellipsoids file loc
+
+const MY_TRIANGLES_URL = '';
+const MY_ELLIPSOIDS_URL = '';
 var defaultEye = vec3.fromValues(0.5, 0.5, -0.5); // default eye position in world space
 var defaultCenter = vec3.fromValues(0.5, 0.5, 0.5); // default view direction in world space
 var defaultUp = vec3.fromValues(0, 1, 0); // default view up vector
@@ -37,10 +40,17 @@ var ambientULoc; // where to put ambient reflectivity for fragment shader
 var diffuseULoc; // where to put diffuse reflectivity for fragment shader
 var specularULoc; // where to put specular reflectivity for fragment shader
 var shininessULoc; // where to put specular exponent for fragment shader
+var alphaULoc;
 
-const BLEND_MODES = 2; // number of total texture/lighting blending modes
+const BLEND_MODES = 4; // number of total texture/lighting blending modes
 var blendModeULoc; // where to put texture blending mode
 var blendingMode = 0; // mode of blending between textures
+
+var transparency = true;
+var transparencyPassULoc;
+var useTransparencyULoc;
+
+var myScene = false;
 
 /* interaction variables */
 var Eye = vec3.clone(defaultEye); // eye position in world space
@@ -239,8 +249,27 @@ function handleKeyDown(event) {
                 vec3.set(inputEllipsoids[whichTriSet].yAxis, 0, 1, 0);
             } // end for all ellipsoids
             break;
-        case "b":
-            blendingMode = (blendingMode + 1) % BLEND_MODES; 
+        case "KeyB":
+            blendingMode = (blendingMode + 1) % BLEND_MODES;
+            var s = "";
+            switch (blendingMode) {
+                case 0: s = "Combine"; break;
+                case 1: s = "Texture color only"; break;
+                case 2: s = "Lighting color only"; break;
+                case 3: s = "Depth buffer value"; break;
+            }
+            console.log("Blending mode: " + blendingMode + " [" + s + "]");
+            break;
+        case "KeyV":
+            transparency = !transparency;
+            console.log("Transparency: " + (transparency ? "on" : "off"));
+            break;
+        case "Digit1":
+            if(!event.getModifierState("Shift")) {
+                break;
+            } 
+            myScene = !myScene;
+            loadModels();
             break;
     } // end switch
 } // end handleKeyDown
@@ -327,7 +356,9 @@ function loadTexture(url) {
 
 function loadTriangles(maxCorner, minCorner) {
     inputTriangles = getJSONFile(INPUT_TRIANGLES_URL, "triangles"); // read in the triangle data
-
+    if(myScene) {
+        inputTriangles = getJSONFile(MY_TRIANGLES_URL, "my triangles");
+    }
 
     if (inputTriangles == String.null)
         throw "Unable to load triangles file!";
@@ -363,7 +394,7 @@ function loadTriangles(maxCorner, minCorner) {
                 uvToAdd = inputTriangles[whichSet].uvs[whichSetVert]; // get uv to add
                 inputTriangles[whichSet].glVertices.push(vtxToAdd[0], vtxToAdd[1], vtxToAdd[2]); // put coords in set coord list
                 inputTriangles[whichSet].glNormals.push(normToAdd[0], normToAdd[1], normToAdd[2]); // put normal in set coord list
-                inputTriangles[whichSet].glUVs.push(uvToAdd[0], uvToAdd[1]); // put uv in set coord list
+                inputTriangles[whichSet].glUVs.push(uvToAdd[0], 1 - uvToAdd[1]); // put uv in set coord list
                 vec3.max(maxCorner, maxCorner, vtxToAdd); // update world bounding box corner maxima
                 vec3.min(minCorner, minCorner, vtxToAdd); // update world bounding box corner minima
                 vec3.add(inputTriangles[whichSet].center, inputTriangles[whichSet].center, vtxToAdd); // add to ctr sum
@@ -427,9 +458,9 @@ function makeEllipsoid(currEllipsoid, numLongSteps, minXYZ, maxXYZ, minCorner, m
 
             // make vertices
             var ellipsoidVertices = [0, -1, 0]; // vertices to return, init to south pole
-            var ellipsoidUVs = [0, 0];
+            var ellipsoidUVs = [0.5, 0];
 
-            var angleIncr = (Math.PI + Math.PI) / numLongSteps; // angular increment 
+            var angleIncr = (2 * Math.PI) / numLongSteps; // angular increment 
             var latLimitAngle = angleIncr * (Math.floor(numLongSteps / 4) - 1); // start/end lat angle
             var latRadius, latY; // radius and Y at current latitude
             for (var latAngle = -latLimitAngle; latAngle <= latLimitAngle; latAngle += angleIncr) {
@@ -437,12 +468,12 @@ function makeEllipsoid(currEllipsoid, numLongSteps, minXYZ, maxXYZ, minCorner, m
                 latY = Math.sin(latAngle); // height at current latitude
                 for (var longAngle = 0; longAngle < 2 * Math.PI; longAngle += angleIncr) { // for each long
                     ellipsoidVertices.push(latRadius * Math.sin(longAngle), latY, latRadius * Math.cos(longAngle));
-                    ellipsoidUVs.push(longAngle / (2 * Math.PI), latAngle / (2 * Math.PI));
+                    ellipsoidUVs.push(longAngle / (2 * Math.PI), 1 - (latAngle / (Math.PI) + 0.5));
                 }
 
             } // end for each latitude
             ellipsoidVertices.push(0, 1, 0); // add north pole
-            ellipsoidUVs.push(1, 1);
+            ellipsoidUVs.push(0.5, 1);
             ellipsoidVertices = ellipsoidVertices.map(function (val, idx) { // position and scale ellipsoid
                 switch (idx % 3) {
                     case 0: // x
@@ -506,6 +537,10 @@ function makeEllipsoid(currEllipsoid, numLongSteps, minXYZ, maxXYZ, minCorner, m
 function loadEllipsoids(maxCorner, minCorner) {
 
     inputEllipsoids = getJSONFile(INPUT_ELLIPSOIDS_URL, "ellipsoids"); // read in the ellipsoids
+    
+    if(myScene) {
+        inputEllipsoids = getJSONFile(MY_ELLIPSOIDS_URL, "ellipsoids");
+    }
 
     if (inputEllipsoids == String.null)
         throw "Unable to load ellipsoids file!";
@@ -630,10 +665,13 @@ function setupShaders() {
         uniform vec3 u_diffuse; // the diffuse reflectivity
         uniform vec3 u_specular; // the specular reflectivity
         uniform float u_shininess; // the specular exponent
+        uniform float u_alpha; // alpha for transparency
 
         // texture properties
         uniform sampler2D u_uvSampler;
         uniform int u_blendingMode;
+        uniform bool u_transparencyPass;
+        uniform bool u_useTransparency;
         
         // geometry properties
         varying vec3 v_worldPos; // world xyz of fragment
@@ -660,20 +698,31 @@ function setupShaders() {
             // get texture color from uv
             vec4 texColor = texture2D(u_uvSampler, v_vertexUV);
             
-            // ignore this for time being
-            vec3 colorOut = ambient + diffuse + specular; // no specular yet
+            vec3 lightColor = ambient + diffuse + specular; // no specular yet
 
-            vec4 finalColor = vec4(0.0, 0.0, 0.0, 0.0);
+            vec4 finalColor = vec4(0.0, 0.0, 0.0, 1.0);
+            if(u_useTransparency && !u_transparencyPass && (u_alpha < 1.0 || texColor.a < 1.0)) {
+                discard;
+            } 
 
-            switch(u_blendingMode) {
-                case 0:
-                    finalColor = vec4(texColor * vec4(colorOut, 1.0));
-                    break;
-                case 1:
-
-                    break;
+            if(u_blendingMode == 0) {
+                finalColor = vec4(texColor * vec4(lightColor, u_alpha));
             }
-        
+            else if(u_blendingMode == 1) {
+                finalColor = vec4(texColor);
+            }
+            else if(u_blendingMode == 2) {
+                finalColor = vec4(lightColor, u_alpha);
+            }
+            else {
+                float depth = 1.0 - (gl_FragCoord.z * gl_FragCoord.z); // square to appear brighter
+                finalColor = vec4(depth, depth, depth, 1.0);
+            }
+
+            if(!u_useTransparency) {
+                finalColor.a = 1.0;
+            }
+
             gl_FragColor = finalColor; 
         }
     `;
@@ -726,8 +775,11 @@ function setupShaders() {
                 diffuseULoc = gl.getUniformLocation(shaderProgram, "u_diffuse"); // ptr to diffuse
                 specularULoc = gl.getUniformLocation(shaderProgram, "u_specular"); // ptr to specular
                 shininessULoc = gl.getUniformLocation(shaderProgram, "u_shininess"); // ptr to shininess
+                alphaULoc = gl.getUniformLocation(shaderProgram, "u_alpha");
 
                 textureULoc = gl.getUniformLocation(shaderProgram, "u_uvSampler"); // ptr to texture sampler
+                transparencyPassULoc = gl.getUniformLocation(shaderProgram, "u_transparencyPass");
+                useTransparencyULoc = gl.getUniformLocation(shaderProgram, "u_useTransparency");
 
                 blendModeULoc = gl.getUniformLocation(shaderProgram, "u_blendingMode"); // ptr to texture/lighting blending mode integer
 
@@ -737,7 +789,6 @@ function setupShaders() {
                 gl.uniform3fv(lightDiffuseULoc, lightDiffuse); // pass in the light's diffuse emission
                 gl.uniform3fv(lightSpecularULoc, lightSpecular); // pass in the light's specular emission
                 gl.uniform3fv(lightPositionULoc, lightPosition); // pass in the light's position
-                gl.uniform1i(blendModeULoc, blendingMode); // pass in the color/texture blending mode
             } // end if no shader program link errors
         } // end if no compile errors
     } // end try 
@@ -751,9 +802,9 @@ function setupShaders() {
 function makeModelTransform(currModel, mMatrix) {
 
     var zAxis, sumRotation, temp, negCtr;
-    zAxis = vec3.create(); 
-    sumRotation = mat4.create(); 
-    temp = mat4.create(); 
+    zAxis = vec3.create();
+    sumRotation = mat4.create();
+    temp = mat4.create();
     negCtr = vec3.create();
 
     // move the model to the origin
@@ -781,9 +832,7 @@ function makeModelTransform(currModel, mMatrix) {
 } // end make model transform
 
 
-// render the loaded model
-function renderModels() {
-
+function renderPass(transparency) {
     // var hMatrix = mat4.create(); // handedness matrix
     var pMatrix = mat4.create(); // projection matrix
     var vMatrix = mat4.create(); // view matrix
@@ -791,9 +840,7 @@ function renderModels() {
     var pvMatrix = mat4.create(); // hand * proj * view matrices
     var pvmMatrix = mat4.create(); // hand * proj * view * model matrices
 
-    window.requestAnimationFrame(renderModels); // set up frame render callback
-
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
+    gl.uniform1i(transparencyPassULoc, transparency);
 
     // set up projection and view
     // mat4.fromScaling(hMatrix,vec3.fromValues(-1,1,1)); // create handedness matrix
@@ -818,6 +865,7 @@ function renderModels() {
         gl.uniform3fv(diffuseULoc, currSet.material.diffuse); // pass in the diffuse reflectivity
         gl.uniform3fv(specularULoc, currSet.material.specular); // pass in the specular reflectivity
         gl.uniform1f(shininessULoc, currSet.material.n); // pass in the specular exponent
+        gl.uniform1f(alphaULoc, currSet.material.alpha);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, textures[whichTriSet]);
@@ -837,6 +885,7 @@ function renderModels() {
 
     } // end for each triangle set
 
+
     // render each ellipsoid
     var ellipsoid, instanceTransform = mat4.create(); // the current ellipsoid and material
 
@@ -855,6 +904,7 @@ function renderModels() {
         gl.uniform3fv(diffuseULoc, ellipsoid.diffuse); // pass in the diffuse reflectivity
         gl.uniform3fv(specularULoc, ellipsoid.specular); // pass in the specular reflectivity
         gl.uniform1f(shininessULoc, ellipsoid.n); // pass in the specular exponent
+        gl.uniform1f(alphaULoc, ellipsoid.alpha);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, textures[index]);
@@ -872,6 +922,28 @@ function renderModels() {
         // draw a transformed instance of the ellipsoid
         gl.drawElements(gl.TRIANGLES, triSetSizes[numTriangleSets + whichEllipsoid], gl.UNSIGNED_SHORT, 0); // render
     } // end for each ellipsoid
+}
+// render the loaded model
+function renderModels() {
+    window.requestAnimationFrame(renderModels); // set up frame render callback
+
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
+
+    gl.uniform1i(blendModeULoc, blendingMode); // pass in the color/texture blending mode
+    gl.uniform1i(useTransparencyULoc, transparency);
+    gl.disable(gl.BLEND);
+    gl.depthMask(true);
+    renderPass(false);
+
+    if (transparency) {
+        // second pass for transparency
+        gl.depthMask(false);
+        gl.enable(gl.BLEND);
+        gl.blendEquation(gl.FUNC_ADD);
+        gl.blendFunc(gl.ONE_MINUS_CONSTANT_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        renderPass(true);
+    }
+
 } // end render model
 
 
