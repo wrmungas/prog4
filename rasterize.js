@@ -976,6 +976,9 @@ function main() {
 // in the interest of simplicity I'm just going to create my scene with functions directly instead
 // Considering how long this file already is I don't think it's that bad to extend it a few more lines
 
+// The scene isn't all that complex: just a cubic room with (goofy) textured walls, some of which are transparent overlays over a opaque background
+// I am kind of proud of the floating globe in the middle though
+
 function createMyTriangles() {
 
     return (
