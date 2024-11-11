@@ -4,8 +4,7 @@
 const INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog4/triangles.json"; // triangles file loc
 const INPUT_ELLIPSOIDS_URL = "https://ncsucgclass.github.io/prog4/ellipsoids.json"; // ellipsoids file loc
 
-const MY_TRIANGLES_URL = '';
-const MY_ELLIPSOIDS_URL = '';
+
 var defaultEye = vec3.fromValues(0.5, 0.5, -0.5); // default eye position in world space
 var defaultCenter = vec3.fromValues(0.5, 0.5, 0.5); // default view direction in world space
 var defaultUp = vec3.fromValues(0, 1, 0); // default view up vector
@@ -265,9 +264,9 @@ function handleKeyDown(event) {
             console.log("Transparency: " + (transparency ? "on" : "off"));
             break;
         case "Digit1":
-            if(!event.getModifierState("Shift")) {
+            if (!event.getModifierState("Shift")) {
                 break;
-            } 
+            }
             myScene = !myScene;
             loadModels();
             break;
@@ -356,8 +355,8 @@ function loadTexture(url) {
 
 function loadTriangles(maxCorner, minCorner) {
     inputTriangles = getJSONFile(INPUT_TRIANGLES_URL, "triangles"); // read in the triangle data
-    if(myScene) {
-        inputTriangles = getJSONFile(MY_TRIANGLES_URL, "my triangles");
+    if (myScene) {
+        inputTriangles = createMyTriangles();
     }
 
     if (inputTriangles == String.null)
@@ -468,7 +467,7 @@ function makeEllipsoid(currEllipsoid, numLongSteps, minXYZ, maxXYZ, minCorner, m
                 latY = Math.sin(latAngle); // height at current latitude
                 for (var longAngle = 0; longAngle < 2 * Math.PI; longAngle += angleIncr) { // for each long
                     ellipsoidVertices.push(latRadius * Math.sin(longAngle), latY, latRadius * Math.cos(longAngle));
-                    ellipsoidUVs.push(longAngle / (2 * Math.PI), 1 - (latAngle / (Math.PI) + 0.5));
+                    ellipsoidUVs.push(longAngle / (2.0 * Math.PI), 1.0 - (latAngle / (Math.PI) + 0.5));
                 }
 
             } // end for each latitude
@@ -537,9 +536,9 @@ function makeEllipsoid(currEllipsoid, numLongSteps, minXYZ, maxXYZ, minCorner, m
 function loadEllipsoids(maxCorner, minCorner) {
 
     inputEllipsoids = getJSONFile(INPUT_ELLIPSOIDS_URL, "ellipsoids"); // read in the ellipsoids
-    
-    if(myScene) {
-        inputEllipsoids = getJSONFile(MY_ELLIPSOIDS_URL, "ellipsoids");
+
+    if (myScene) {
+        inputEllipsoids = createMyEllipsoids();
     }
 
     if (inputEllipsoids == String.null)
@@ -603,6 +602,19 @@ function loadEllipsoids(maxCorner, minCorner) {
 
 // read models in, load them into webgl buffers
 function loadModels() {
+
+    inputTriangles = []; // the triangle data as loaded from input files
+    numTriangleSets = 0; // how many triangle sets in input scene
+    inputEllipsoids = []; // the ellipsoid data as loaded from input files
+    numEllipsoids = 0; // how many ellipsoids in the input scene
+    vertexBuffers = []; // this contains vertex coordinate lists by set, in triples
+    normalBuffers = []; // this contains normal component lists by set, in triples
+    uvBuffers = []; // this contains uv coordinate component lists by set, in doubles
+    textures = []; // this contains the textures for each model
+    triSetSizes = []; // this contains the size of each triangle set
+    triangleBuffers = []; // lists of indices into vertexBuffers by set, in triples
+    viewDelta = 0; // how much to displace view with each key press
+
     var maxCorner = vec3.fromValues(Number.MIN_VALUE, Number.MIN_VALUE, Number.MIN_VALUE); // bbox corner
     var minCorner = vec3.fromValues(Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE); // other corner
 
@@ -957,3 +969,91 @@ function main() {
     renderModels(); // draw the triangles using webGL
 
 } // end main
+
+
+// apologies for this but I couldn't figure out hosting my own JSON files externally
+// I tried using my github to host both the triangles/ellipsoids but the resources won't load; however images work fine
+// in the interest of simplicity I'm just going to create my scene with functions directly instead
+// Considering how long this file already is I don't think it's that bad to extend it a few more lines
+
+function createMyTriangles() {
+
+    return (
+        [
+            {
+                material: { ambient: [0.1, 0.1, 0.1], diffuse: [0.4, 0.4, 0.4], specular: [0.3, 0.3, 0.3], n: 11, alpha: 1.0, texture: "https://i.redd.it/cs8xid8pjno31.png" },
+                vertices: [[-2, 0, 1.98], [-2, 4, 1.98], [2, 4, 1.98], [2, 0, 1.98]],
+                normals: [[0, 0, -1], [0, 0, -1], [0, 0, -1], [0, 0, -1]],
+                uvs: [[1, 0], [1, 1], [0, 1], [0, 0]],
+                triangles: [[0, 1, 2], [0, 2, 3]]
+            },
+            {
+                material: { ambient: [0.1, 0.1, 0.1], diffuse: [0.7, 0.7, 0.0], specular: [0.3, 0.3, 0.3], n: 11, alpha: 1.0, texture: "stars.jpg" },
+                vertices: [[-2, 0, 2], [-2, 4, 2], [2, 4, 2], [2, 0, 2]],
+                normals: [[0, 0, -1], [0, 0, -1], [0, 0, -1], [0, 0, -1]],
+                uvs: [[0, 0], [0, 1], [1, 1], [1, 0]],
+                triangles: [[0, 1, 2], [0, 2, 3]]
+            },
+            {
+                material: { ambient: [0.3, 0.3, 0.3], diffuse: [0.8, 0.8, 0.8], specular: [0.3, 0.3, 0.3], n: 11, alpha: 1.0, texture: "https://i.redd.it/6rfyaxxhuel61.png" },
+                vertices: [[2, 0, 2], [2, 4, 2], [2, 4, -2], [2, 0, -2]],
+                normals: [[-1, 0, 0], [-1, 0, 0], [-1, 0, 0], [-1, 0, 0]],
+                uvs: [[1, 0], [1, 1], [0, 1], [0, 0]],
+                triangles: [[0, 1, 2], [0, 2, 3]]
+            },
+            {
+                material: { ambient: [0.3, 0.3, 0.3], diffuse: [0.2, 0.4, 0.2], specular: [0.3, 0.3, 0.3], n: 11, alpha: 1.0, texture: "tree.png" },
+                vertices: [[-1.98, 0, 2], [-1.98, 4, 2], [-1.98, 4, -2], [-1.98, 0, -2]],
+                normals: [[1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0]],
+                uvs: [[0, 0], [0, 1], [1, 1], [1, 0]],
+                triangles: [[0, 1, 2], [0, 2, 3]]
+            },
+            {
+                material: { ambient: [0.3, 0.3, 0.3], diffuse: [0.0, 0.7, 0.7], specular: [0.3, 0.3, 0.3], n: 11, alpha: 1.0, texture: "stars.jpg" },
+                vertices: [[-2, 0, 2], [-2, 4, 2], [-2, 4, -2], [-2, 0, -2]],
+                normals: [[1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0]],
+                uvs: [[0, 0], [0, 1], [1, 1], [1, 0]],
+                triangles: [[0, 1, 2], [0, 2, 3]]
+            },
+            {
+                material: { ambient: [0.1, 0.1, 0.1], diffuse: [0.9, 0.9, 0.9], specular: [0.3, 0.3, 0.3], n: 11, alpha: 1.0, texture: "rocktile.jpg" },
+                vertices: [[-2, 0, -2], [-2, 0, 2], [2, 0, 2], [2, 0, -2]],
+                normals: [[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]],
+                uvs: [[0, 0], [0, 1], [1, 1], [1, 0]],
+                triangles: [[0, 1, 2], [0, 2, 3]]
+            },
+            {
+                material: { ambient: [0.1, 0.1, 0.1], diffuse: [0.3, 0.3, 0.3], specular: [0.3, 0.3, 0.3], n: 11, alpha: 1.0, texture: "https://upload.wikimedia.org/wikipedia/en/2/24/North_Carolina_State_University_seal.svg" },
+                vertices: [[-1, 0.01, -1], [-1, 0.01, 1], [1, 0.01, 1], [1, 0.01, -1]],
+                normals: [[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]],
+                uvs: [[0, 0], [0, 1], [1, 1], [1, 0]],
+                triangles: [[0, 1, 2], [0, 2, 3]]
+            },
+            {
+                material: { ambient: [0.1, 0.1, 0.1], diffuse: [0.9, 0.9, 0.9], specular: [0.3, 0.3, 0.3], n: 11, alpha: 0.8, texture: "stars.jpg" },
+                vertices: [[-2, 4, -2], [-2, 4, 2], [2, 4, 2], [2, 4, -2]],
+                normals: [[0, -1, 0], [0, -1, 0], [0, -1, 0], [0, -1, 0]],
+                uvs: [[0, 0], [0, 1], [1, 1], [1, 0]],
+                triangles: [[0, 1, 2], [0, 2, 3]]
+            },
+            {
+                material: { ambient: [0.7, 0.7, 0.7], diffuse: [0.2, 0.4, 0.2], specular: [0.3, 0.3, 0.3], n: 11, alpha: 1.0, texture: "https://t4.ftcdn.net/jpg/07/71/17/11/360_F_771171175_4hD5F0gFznDfudqIolxHo7If0qa1D6Za.jpg" },
+                vertices: [[-2, 0, -2], [-2, 4, -2], [2, 4, -2], [2, 0, -2]],
+                normals: [[0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1]],
+                uvs: [[0, 0], [0, 1], [1, 1], [1, 0]],
+                triangles: [[0, 1, 2], [0, 2, 3]]
+            },
+        ]
+    );
+
+}
+
+function createMyEllipsoids() {
+    return (
+        [
+            { x: 0.0, y: 0.4, z: 0.0, a: 0.4, b: 0.4, c: 0.4, ambient: [0.3, 0.3, 0.3], diffuse: [0.0, 0.5, 0.1], specular: [0.3, 0.3, 0.3], n: 5, alpha: 1, texture: "earth.png" },
+            { x: 0.0, y: 0.4, z: 0.0, a: 0.398, b: 0.398, c: 0.398, ambient: [0.2, 0.2, 0.6], diffuse: [0.2, 0.2, 0.6], specular: [0.5, 0.5, 0.5], n: 20, alpha: 1, texture: "https://www.manytextures.com/thumbnail/30/512/rough-sea.jpg" },
+            { x: 0.0, y: 0.4, z: 0.0, a: 0.415, b: 0.415, c: 0.415, ambient: [0.4, 0.4, 0.4], diffuse: [0.5, 0.5, 0.5], specular: [0.1, 0.1, 0.1], n: 2, alpha: 0.1, texture: "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/i/54d29bda-085e-44fc-b3e9-8c14f0695e6c/dc70dkn-a88ac194-06a6-42a9-ae4f-91fab1cf0974.png" }
+        ]
+    );
+}
